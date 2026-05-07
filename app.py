@@ -49,15 +49,18 @@ for i, row in enumerate(records, start=2):
 records = ws.get_all_records()
 df = pd.DataFrame(records)
 
-# =============================
+# ===========================
 # GET record_id FROM QR
-# =============================
-params = st.experimental_get_query_params()
-record_id = params.get("id", [None])[0]
+# ===========================
+params = st.query_params
+record_id = params.get("id")
 
 if not record_id:
     st.warning("Vui lòng quét QR code")
     st.stop()
+
+# st.query_params trả về list → lấy phần tử đầu
+record_id = record_id[0]
 
 row = df[df["record_id"] == record_id]
 if row.empty:
