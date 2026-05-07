@@ -21,7 +21,7 @@ creds = Credentials.from_service_account_info(
 
 gc = gspread.authorize(creds)
 sheet = gc.open_by_key(st.secrets["GOOGLE_SHEET_ID"])
-ws = sheet.worksheet("DATA")
+ws = sheet.worksheet("Sheet1")
 df = pd.DataFrame(ws.get_all_records())
 
 # ===============================
