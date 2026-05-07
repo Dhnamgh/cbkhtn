@@ -1,21 +1,17 @@
 import streamlit as st
 import pandas as pd
 import gspread
-import uuid
-import json
 from google.oauth2.service_account import Credentials
 from datetime import datetime
+import qrcode
+import io
 
-st.set_page_config(page_title="Tra cứu đảng phí", layout="centered")
-st.title("TRA CỨU ĐẢNG PHÍ")
+st.set_page_config(page_title="Tra cứu thông tin", layout="centered")
+st.title("TRA CỨU THÔNG TIN CÁ NHÂN")
 
 # ===============================
-# CONNECT GOOGLE SHEET (FIXED)
+# CONNECT GOOGLE SHEET
 # ===============================
-scope = ["https://www.googleapis.com/auth/spreadsheets"]
-
-from google.oauth2.service_account import Credentials
-
 scope = ["https://www.googleapis.com/auth/spreadsheets"]
 
 creds = Credentials.from_service_account_info(
@@ -25,81 +21,79 @@ creds = Credentials.from_service_account_info(
 
 gc = gspread.authorize(creds)
 sheet = gc.open_by_key(st.secrets["GOOGLE_SHEET_ID"])
-ws = sheet.worksheet("Sheet1")
+ws = sheet.worksheet("DATA")
+df = pd.DataFrame(ws.get_all_records())
 
+# ===============================
+# HIỂN THỊ QR CHUNG
+# ===============================
+st.subheader("Bước 1: Quét mã QR để truy cập")
 
-records = ws.get_all_records()
-headers = ws.row_values(1)
+app_url = st.secrets.get("APP_URL", "https://ten-app.streamlit.app/")
 
-# =============================
-# AUTO CREATE record_id (ONE TIME)
-# =============================
-if "record_id" not in headers:
-    ws.update_cell(1, len(headers) + 1, "record_id")
-    headers.append("record_id")
+qr = qrcode.make(app_url)
+buf = io.BytesIO()
+qr.save(buf)
+st.image(buf.getvalue(), caption="Quét QR bằng Zalo")
 
-record_id_col = headers.index("record_id") + 1
+st.divider()
 
-for i, row in enumerate(records, start=2):
-    if row.get("record_id", "") == "":
-        rid = uuid.uuid4().hex[:8].upper()
-        ws.update_cell(i, record_id_col, rid)
+# ===============================
+# NHẬP MẬT KHẨU
+# ===============================
+st.subheader("Bước 2: Nhập mật khẩu")
 
-# Reload data after update
-records = ws.get_all_records()
-df = pd.DataFrame(records)
-
-# ===========================
-# GET record_id FROM QR
-# ===========================
-params = st.query_params
-record_id = params.get("id")
-
-if not record_id:
-    st.warning("Vui lòng quét QR code")
-    st.stop()
-
-# st.query_params trả về list → lấy phần tử đầu
-record_id = record_id[0]
-
-row = df[df["record_id"] == record_id]
-if row.empty:
-    st.error("Không tìm thấy dữ liệu")
-    st.stop()
-
-row = row.iloc[0]
-
-# =============================
-# PASSWORD CHECK
-# =============================
-pwd = st.text_input(
-    "Nhập mật khẩu (DDMMYY + 4 số cuối CCCD)",
+password = st.text_input(
+    "Mật khẩu = DDMMYY + 4 số cuối CCCD",
     type="password"
 )
 
-if pwd:
-    dob = datetime.strptime(row["NTNS"], "%d/%m/%Y")
-    correct_pwd = dob.strftime("%d%m%y") + str(row["Số CCCD"])[-4:]
+if not password:
+    st.stop()
 
-    if pwd != correct_pwd:
-        st.error("Sai mật khẩu")
-        st.stop()
+# ===============================
+# XÁC THỰC & TRA CỨU
+# ===============================
+if len(password) < 10:
+    st.error("Mật khẩu không hợp lệ")
+    st.stop()
 
-    # =============================
-    # SHOW DATA (HEADER + 1 ROW)
-    # =============================
-    st.success("✅ Xác thực thành công")
-    st.subheader("ĐẢNG PHÍ THÁNG 02 – 2026")
+ddmmyy = password[:6]
+last4 = password[-4:]
 
-    data = {
-        "Họ và tên": row["Họ và tên"],
-        "Ngày sinh": row["NTNS"],
-        "Lương chính": f"{row['Lương chính']:,}",
-        "Vượt khung": f"{row['Vượt khung']:,}",
-        "Phụ cấp chức vụ": f"{row['Phụ cấp chức vụ']:,}",
-        "Thâm niên nhà giáo": f"{row['Thâm niên nhà giáo']:,}",
-        "Cộng": f"{row['Cộng']:,}",
-        "1% thu nhập/tháng": f"{row['1% thu nhập/tháng']:,}",
-    }
+def match_row(row):
+    try:
+        dob = datetime.strptime(row["NTNS"], "%d/%m/%Y")
+        return (
+            dob.strftime("%d%m%y") == ddmmyy
+            and str(row["Số CCCD"]).endswith(last4)
+        )
+    except:
+        return False
 
-    st.table(pd.DataFrame(data.items(), columns=["Nội dung", "Giá trị"]))
+matched = df[df.apply(match_row, axis=1)]
+
+if matched.empty:
+    st.error("Không tìm thấy thông tin phù hợp")
+    st.stop()
+
+row = matched.iloc[0]
+
+# ===============================
+# HIỂN THỊ THÔNG TIN
+# ===============================
+st.success("✅ Xác thực thành công")
+st.subheader("THÔNG TIN CỦA BẠN")
+
+result = {
+    "Họ và tên": row["Họ và tên"],
+    "Ngày sinh": row["NTNS"],
+    "Lương chính": f"{row['Lương chính']:,}",
+    "Vượt khung": f"{row['Vượt khung']:,}",
+    "Phụ cấp chức vụ": f"{row['Phụ cấp chức vụ']:,}",
+    "Thâm niên nhà giáo": f"{row['Thâm niên nhà giáo']:,}",
+    "Cộng": f"{row['Cộng']:,}",
+    "1% thu nhập/tháng": f"{row['1% thu nhập/tháng']:,}",
+}
+
+st.table(pd.DataFrame(result.items(), columns=["Nội dung", "Giá trị"]))
