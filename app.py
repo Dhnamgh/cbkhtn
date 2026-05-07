@@ -9,16 +9,19 @@ from datetime import datetime
 st.set_page_config(page_title="Tra cứu đảng phí", layout="centered")
 st.title("TRA CỨU ĐẢNG PHÍ")
 
-# =============================
-# CONNECT GOOGLE SHEET
-# =============================
+# ===============================
+# CONNECT GOOGLE SHEET (FIXED)
+# ===============================
 scope = ["https://www.googleapis.com/auth/spreadsheets"]
+
+service_account_info = json.loads(st.secrets["SERVICE_ACCOUNT"])
+
 creds = Credentials.from_service_account_info(
-    st.secrets["SERVICE_ACCOUNT"],
+    service_account_info,
     scopes=scope
 )
-gc = gspread.authorize(creds)
 
+gc = gspread.authorize(creds)
 sheet = gc.open_by_key(st.secrets["GOOGLE_SHEET_ID"])
 ws = sheet.worksheet("DATA")
 
