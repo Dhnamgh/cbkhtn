@@ -3,8 +3,67 @@ import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
 
-st.set_page_config(page_title="Tra cứu thông tin", layout="centered")
+# ===============================
+# PAGE CONFIG (PHẢI ĐẶT TRƯỚC UI)
+# ===============================
+st.set_page_config(
+    page_title="Tra cứu thông tin cá nhân",
+    layout="centered"
+)
+
+# ===============================
+# CSS: ẨN TOÀN BỘ UI RÁC STREAMLIT
+# ===============================
+st.markdown("""
+<style>
+/* Ẩn menu, header, footer */
+#MainMenu {visibility: hidden;}
+footer {visibility: hidden;}
+header {visibility: hidden;}
+
+/* Ẩn nút menu trên mobile */
+button[kind="header"] {
+    display: none !important;
+}
+
+/* Ẩn panel debug / dev nếu có */
+.st-emotion-cache-1gv3huu,
+.st-emotion-cache-1y4p8pa,
+.st-emotion-cache-1dp5vir {
+    display: none !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# ===============================
+# CSS: LÀM RÕ Ô NHẬP MẬT KHẨU
+# ===============================
+st.markdown("""
+<style>
+input[type="password"], 
+input[type="text"] {
+    background-color: #ffffff !important;
+    border: 2px solid #1f6fff !important;
+    border-radius: 10px !important;
+    padding: 14px !important;
+    font-size: 18px !important;
+    color: #000000 !important;
+}
+
+input[type="password"]:focus,
+input[type="text"]:focus {
+    outline: none !important;
+    border-color: #0b5ed7 !important;
+    box-shadow: 0 0 0 3px rgba(11, 94, 215, 0.25) !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# ===============================
+# UI
+# ===============================
 st.title("TRA CỨU THÔNG TIN CÁ NHÂN")
+st.write("🔐 Nhập **6 số cuối của CCCD** để xem thông tin của bạn.")
 
 # ===============================
 # CONNECT GOOGLE SHEET
@@ -19,16 +78,16 @@ creds = Credentials.from_service_account_info(
 gc = gspread.authorize(creds)
 sheet = gc.open_by_key(st.secrets["GOOGLE_SHEET_ID"])
 
-# ✅ ĐÚNG TÊN TAB THỰC TẾ
+# ⚠️ ĐÚNG TÊN TAB CỦA BẠN
 ws = sheet.worksheet("Sheet1")
 df = pd.DataFrame(ws.get_all_records())
 
 # ===============================
-# NHẬP MẬT KHẨU
+# INPUT MẬT KHẨU
 # ===============================
-st.subheader("Nhập mật khẩu")
 password = st.text_input(
-    "Mật khẩu là 6 số cuối của CCCD",
+    "Mật khẩu",
+    placeholder="Nhập 6 số cuối CCCD",
     type="password"
 )
 
@@ -41,7 +100,7 @@ password = password.strip()
 # KIỂM TRA MẬT KHẨU
 # ===============================
 if not password.isdigit() or len(password) != 6:
-    st.error("Mật khẩu phải gồm đúng 6 chữ số")
+    st.error("❌ Mật khẩu phải gồm đúng 6 chữ số")
     st.stop()
 
 def match_row(row):
@@ -50,14 +109,13 @@ def match_row(row):
 matched = df[df.apply(match_row, axis=1)]
 
 if matched.empty:
-    st.error("Không tìm thấy thông tin phù hợp")
+    st.error("❌ Không tìm thấy thông tin phù hợp")
     st.stop()
 
-# Nếu trùng (hiếm), lấy dòng đầu
 row = matched.iloc[0]
 
 # ===============================
-# HIỂN THỊ THÔNG TIN
+# HIỂN THỊ KẾT QUẢ
 # ===============================
 st.success("✅ Xác thực thành công")
 
