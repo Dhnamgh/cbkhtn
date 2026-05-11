@@ -2,9 +2,6 @@ import streamlit as st
 import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
-from datetime import datetime
-import qrcode
-import io
 
 st.set_page_config(page_title="Tra cứu thông tin", layout="centered")
 st.title("TRA CỨU THÔNG TIN CÁ NHÂN")
@@ -21,55 +18,34 @@ creds = Credentials.from_service_account_info(
 
 gc = gspread.authorize(creds)
 sheet = gc.open_by_key(st.secrets["GOOGLE_SHEET_ID"])
+
+# ✅ ĐÚNG TÊN TAB THỰC TẾ
 ws = sheet.worksheet("Sheet1")
 df = pd.DataFrame(ws.get_all_records())
 
 # ===============================
-# HIỂN THỊ QR CHUNG
-# ===============================
-st.subheader("Bước 1: Quét mã QR để truy cập")
-
-app_url = st.secrets.get("APP_URL", "https://ten-app.streamlit.app/")
-
-qr = qrcode.make(app_url)
-buf = io.BytesIO()
-qr.save(buf)
-st.image(buf.getvalue(), caption="Quét QR bằng Zalo")
-
-st.divider()
-
-# ===============================
 # NHẬP MẬT KHẨU
 # ===============================
-st.subheader("Bước 2: Nhập mật khẩu")
-
+st.subheader("Nhập mật khẩu")
 password = st.text_input(
-    "Mật khẩu = DDMMYY + 4 số cuối CCCD",
+    "Mật khẩu là 6 số cuối của CCCD",
     type="password"
 )
 
 if not password:
     st.stop()
 
+password = password.strip()
+
 # ===============================
-# XÁC THỰC & TRA CỨU
+# KIỂM TRA MẬT KHẨU
 # ===============================
-if len(password) < 10:
-    st.error("Mật khẩu không hợp lệ")
+if not password.isdigit() or len(password) != 6:
+    st.error("Mật khẩu phải gồm đúng 6 chữ số")
     st.stop()
 
-ddmmyy = password[:6]
-last4 = password[-4:]
-
 def match_row(row):
-    try:
-        dob = datetime.strptime(row["NTNS"], "%d/%m/%Y")
-        return (
-            dob.strftime("%d%m%y") == ddmmyy
-            and str(row["Số CCCD"]).endswith(last4)
-        )
-    except:
-        return False
+    return str(row["Số CCCD"]).endswith(password)
 
 matched = df[df.apply(match_row, axis=1)]
 
@@ -77,17 +53,17 @@ if matched.empty:
     st.error("Không tìm thấy thông tin phù hợp")
     st.stop()
 
+# Nếu trùng (hiếm), lấy dòng đầu
 row = matched.iloc[0]
 
 # ===============================
 # HIỂN THỊ THÔNG TIN
 # ===============================
 st.success("✅ Xác thực thành công")
-st.subheader("THÔNG TIN CỦA BẠN")
 
 result = {
     "Họ và tên": row["Họ và tên"],
-    "Ngày sinh": row["NTNS"],
+    "Số CCCD": row["Số CCCD"],
     "Lương chính": f"{row['Lương chính']:,}",
     "Vượt khung": f"{row['Vượt khung']:,}",
     "Phụ cấp chức vụ": f"{row['Phụ cấp chức vụ']:,}",
