@@ -12,36 +12,43 @@ st.set_page_config(
 )
 
 # ===============================
-# CSS: ẨN TOÀN BỘ UI RÁC STREAMLIT
+# CSS: ẨN UI STREAMLIT + OVERLAY KHÓA CLICK
 # ===============================
 st.markdown("""
 <style>
-/* Ẩn menu, header, footer */
+/* ===== ẨN MENU / HEADER / FOOTER ===== */
 #MainMenu {visibility: hidden;}
 footer {visibility: hidden;}
 header {visibility: hidden;}
+button[kind="header"] {display: none !important;}
 
-/* Ẩn nút menu trên mobile */
-button[kind="header"] {
-    display: none !important;
+/* ===== KHÓA TOÀN BỘ CLICK APP ===== */
+[data-testid="stAppViewContainer"] {
+    pointer-events: none;
 }
 
-/* Ẩn panel debug / dev nếu có */
-.st-emotion-cache-1gv3huu,
-.st-emotion-cache-1y4p8pa,
-.st-emotion-cache-1dp5vir {
-    display: none !important;
+/* ===== OVERLAY PHỦ TOÀN MÀN ===== */
+#screen-lock {
+    position: fixed;
+    inset: 0;
+    background: rgba(255,255,255,0.0);
+    z-index: 9999;
 }
-</style>
-""", unsafe_allow_html=True)
 
-# ===============================
-# CSS: LÀM RÕ Ô NHẬP MẬT KHẨU
-# ===============================
-st.markdown("""
-<style>
-input[type="password"], 
-input[type="text"] {
+/* ===== VÙNG DUY NHẤT ĐƯỢC TƯƠNG TÁC ===== */
+#unlock-zone {
+    position: fixed;
+    top: 20%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 90%;
+    max-width: 450px;
+    z-index: 10000;
+    pointer-events: auto;
+}
+
+/* ===== STYLE Ô NHẬP RÕ RÀNG ===== */
+input[type="password"], input[type="text"] {
     background-color: #ffffff !important;
     border: 2px solid #1f6fff !important;
     border-radius: 10px !important;
@@ -54,19 +61,15 @@ input[type="password"]:focus,
 input[type="text"]:focus {
     outline: none !important;
     border-color: #0b5ed7 !important;
-    box-shadow: 0 0 0 3px rgba(11, 94, 215, 0.25) !important;
+    box-shadow: 0 0 0 3px rgba(11,94,215,0.25) !important;
 }
 </style>
+
+<div id="screen-lock"></div>
 """, unsafe_allow_html=True)
 
 # ===============================
-# UI
-# ===============================
-st.title("TRA CỨU THÔNG TIN CÁ NHÂN")
-st.write("🔐 Nhập **6 số cuối của CCCD** để xem thông tin của bạn.")
-
-# ===============================
-# CONNECT GOOGLE SHEET
+# KẾT NỐI GOOGLE SHEET
 # ===============================
 scope = ["https://www.googleapis.com/auth/spreadsheets"]
 
@@ -77,19 +80,27 @@ creds = Credentials.from_service_account_info(
 
 gc = gspread.authorize(creds)
 sheet = gc.open_by_key(st.secrets["GOOGLE_SHEET_ID"])
-
-# ⚠️ ĐÚNG TÊN TAB CỦA BẠN
-ws = sheet.worksheet("Sheet1")
+ws = sheet.worksheet("Sheet1")  # ĐÚNG TÊN TAB
 df = pd.DataFrame(ws.get_all_records())
 
 # ===============================
-# INPUT MẬT KHẨU
+# GIAO DIỆN NGƯỜI DÙNG (BỊ KHOÁ)
 # ===============================
+st.title("TRA CỨU THÔNG TIN CÁ NHÂN")
+st.markdown("🔐 Nhập **6 số cuối của CCCD** để xem thông tin của bạn.")
+
+# ===============================
+# VÙNG MỞ KHOÁ DUY NHẤT
+# ===============================
+st.markdown('<div id="unlock-zone">', unsafe_allow_html=True)
+
 password = st.text_input(
     "Mật khẩu",
     placeholder="Nhập 6 số cuối CCCD",
     type="password"
 )
+
+st.markdown('</div>', unsafe_allow_html=True)
 
 if not password:
     st.stop()
@@ -103,16 +114,25 @@ if not password.isdigit() or len(password) != 6:
     st.error("❌ Mật khẩu phải gồm đúng 6 chữ số")
     st.stop()
 
-def match_row(row):
-    return str(row["Số CCCD"]).endswith(password)
-
-matched = df[df.apply(match_row, axis=1)]
+matched = df[df["Số CCCD"].astype(str).str.endswith(password)]
 
 if matched.empty:
     st.error("❌ Không tìm thấy thông tin phù hợp")
     st.stop()
 
 row = matched.iloc[0]
+
+# ===============================
+# GỠ OVERLAY – CHO PHÉP XEM KẾT QUẢ
+# ===============================
+st.markdown("""
+<style>
+#screen-lock {display: none;}
+[data-testid="stAppViewContainer"] {
+    pointer-events: auto;
+}
+</style>
+""", unsafe_allow_html=True)
 
 # ===============================
 # HIỂN THỊ KẾT QUẢ
